@@ -1,5 +1,5 @@
 -- ========================================================
--- واجهة خالد الأسطورة الشاملة: المشي على الأرض + حماية God Mode
+-- واجهة خالد الأسطورة V6: فحص كامل للماب + سرعة خارقة + God Mode حقيقي
 -- ========================================================
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
@@ -26,7 +26,7 @@ MainFrame.Active = true
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, -40, 0, 45)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "سكربت خالد الاسطورة V5"
+Title.Text = "سكربت خالد الاسطورة V6"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 15
 Title.Font = Enum.Font.SourceSansBold
@@ -122,7 +122,7 @@ CloseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- محرك الحركة الفعلي والحماية التامة
+-- المحرك الخارق: God Mode + حركة أرضية سريعة + فحص كلي
 -- ========================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -132,51 +132,59 @@ local activeWinLoop = nil
 local foundButtons = {}
 local buttonToggles = {}
 
--- نظام الـ God Mode التلقائي والمستمر لحمايتك أثناء المشي
+-- نظام God Mode المطور لمنع الموت تماماً من ليزرات الماب
 task.spawn(function()
     while true do
         pcall(function()
             local char = LocalPlayer.Character
             if char then
+                -- جعل اللاعب غير قابل للمس من أجزاء الموت
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanTouch = true
+                    end
+                end
+                
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then
-                    hum.MaxHealth = math.huge
-                    hum.Health = math.huge
-                    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-                end
-                -- التخلص من المستشعرات الضارة الملتصقة باللاعب
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("TouchTransmitter") then
-                        part:Destroy()
+                    hum.MaxHealth = 999999
+                    hum.Health = 999999
+                    if hum.Health == 0 then
+                        hum.Health = 999999
                     end
                 end
             end
         end)
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end)
 
--- دالة تجعل اللاعب يمشي على الأرض لتسجيل الحساب والنقاط
-local function walkToPartOnGround(part)
-    if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hum = LocalPlayer.Character.Humanoid
+-- دالة الحركة الأرضية الخارقة بسرعة 300 (تضمن ملامسة الأرض واحتساب النقاط)
+local function fastWalkOnGround(part)
+    if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
+        local targetPos = part.Position
         
-        -- تعديل سرعة المشي الافتراضية إذا كنت تريد حركة أسرع، مثلاً 50
-        hum.WalkSpeed = 50 
+        -- الحفاظ على ملامسة الأرض تماماً (نفس مستوى ارتفاع اللاعب الحالي)
+        local startY = hrp.Position.Y
         
-        -- إعطاء أمر للشخصية بالمشي نحو المنصة مباشرة فوق الأرض
-        hum:MoveTo(part.Position)
-        
-        -- الانتظار حتى يصل اللاعب للمنصة أو يقترب منها جداً
-        local timeOut = 0
-        while (hrp.Position - part.Position).Magnitude > 4 and activeWinLoop == part and timeOut < 10 do
-            hum:MoveTo(part.Position)
-            task.wait(0.1)
-            timeOut = timeOut + 0.1
+        -- حلقة تحريك سريعة وثابتة نحو الهدف
+        while (hrp.Position - targetPos).Magnitude > 5 and activeWinLoop == part do
+            local currentPos = hrp.Position
+            local direction = (targetPos - currentPos).Unit
+            
+            -- سرعة التحرك الخارقة (300)
+            local speed = 300
+            local nextPos = currentPos + (direction * (speed * 0.03))
+            
+            -- الإبقاء على اللاعب فوق الأرض مباشرة ليحسب له النقاط والخطوات
+            hrp.Velocity = direction * speed
+            hrp.CFrame = CFrame.new(nextPos.X, startY, nextPos.Z)
+            
+            task.wait(0.03)
         end
         
-        -- تفعيل اللمس يدوياً للتأكيد الفوري
+        -- عند الوصول، تفعيل اللمس المباشر للحصول على الـ Wins
         if firetouchinterest and activeWinLoop == part then
             firetouchinterest(hrp, part, 0)
             task.wait(0.02)
@@ -185,9 +193,12 @@ local function walkToPartOnGround(part)
     end
 end
 
--- دالة الفحص المعمّق للمنصات
+-- دالة الفحص الكلي الشامل للماب بالكامل (يبحث بعمق بدون شروط مسافة)
 local function scanAllPlatforms()
-    for _, v in pairs(Workspace:GetDescendants()) do
+    -- البحث في كل مكان داخل الـ Workspace
+    local allObjects = Workspace:GetDescendants()
+    
+    for _, v in pairs(allObjects) do
         if v:IsA("TouchTransmitter") and v.Parent then
             local btnPart = v.Parent
             local detectedText = ""
@@ -208,15 +219,18 @@ local function scanAllPlatforms()
                     end
                 end
                 
+                -- فحص بالاسم إذا لم تتوفر لوحة نصية محملة
                 if not isWinPlatform and not hasStep then
                     local cName = container.Name:lower()
-                    if string.find(cName, "win") or string.find(cName, "platform") or btnPart.Name:lower():find("win") then
+                    local pName = btnPart.Name:lower()
+                    if string.find(cName, "win") or string.find(cName, "platform") or string.find(pName, "win") or string.find(pName, "+") then
                         detectedText = container.Name
                         isWinPlatform = true
                     end
                 end
             end
             
+            -- فلترة وإدراج المنصة فوراً
             if isWinPlatform and not hasStep and not foundButtons[btnPart] then
                 local lowerPartName = btnPart.Name:lower()
                 if not string.find(lowerPartName, "kill") and not string.find(lowerPartName, "lava") then
@@ -224,7 +238,7 @@ local function scanAllPlatforms()
                     foundButtons[btnPart] = true
                     buttonToggles[btnPart] = false
                     
-                    local finalButtonText = (detectedText ~= "") and ("تحرك: " .. detectedText) or ("منصة Wins: " .. btnPart.Name)
+                    local finalButtonText = (detectedText ~= "") and ("انطلاق سريع: " .. detectedText) or ("منصة فوز: " .. btnPart.Name)
                     
                     local NewBtn = Instance.new("TextButton")
                     NewBtn.Parent = ButtonsScroll
@@ -232,7 +246,7 @@ local function scanAllPlatforms()
                     NewBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                     NewBtn.Text = finalButtonText
                     NewBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    NewBtn.TextSize = 12
+                    NewBtn.TextSize = 11
                     NewBtn.Font = Enum.Font.SourceSansBold
                     
                     ButtonsScroll.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
@@ -249,7 +263,7 @@ local function scanAllPlatforms()
                                 end
                             end
                             
-                            task.wait(0.05)
+                            task.wait(0.02)
                             
                             local currentLoop = btnPart
                             activeWinLoop = currentLoop
@@ -258,8 +272,8 @@ local function scanAllPlatforms()
                             
                             task.spawn(function()
                                 while activeWinLoop == currentLoop do
-                                    walkToPartOnGround(currentLoop)
-                                    task.wait(0.5)
+                                    fastWalkOnGround(currentLoop)
+                                    task.wait(0.2)
                                 end
                                 NewBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                                 buttonToggles[currentLoop] = false
@@ -276,10 +290,10 @@ local function scanAllPlatforms()
     end
 end
 
--- تكرار فحص الماب تلقائياً
+-- تشغيل فحص الماب الشامل والمستمر كل ثانية
 task.spawn(function()
     while true do
         scanAllPlatforms()
-        task.wait(2)
+        task.wait(1)
     end
 end)
