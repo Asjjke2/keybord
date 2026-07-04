@@ -1,5 +1,5 @@
 -- ========================================================
--- واجهة خالد الأسطورة الشاملة: جلب كل المنصات + حماية قصوى ضد الموت
+-- واجهة خالد الأسطورة الشاملة: المشي على الأرض + حماية God Mode
 -- ========================================================
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
@@ -26,7 +26,7 @@ MainFrame.Active = true
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, -40, 0, 45)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "سكربت خالد الاسطورة V4"
+Title.Text = "سكربت خالد الاسطورة V5"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 15
 Title.Font = Enum.Font.SourceSansBold
@@ -122,10 +122,9 @@ CloseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- محرك الفحص الشامل والحماية القصوى (God Mode التلقائي)
+-- محرك الحركة الفعلي والحماية التامة
 -- ========================================================
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
@@ -133,7 +132,7 @@ local activeWinLoop = nil
 local foundButtons = {}
 local buttonToggles = {}
 
--- نظام حماية مدمج ومستمر لمنع الموت نهائياً أثناء الحركة
+-- نظام الـ God Mode التلقائي والمستمر لحمايتك أثناء المشي
 task.spawn(function()
     while true do
         pcall(function()
@@ -145,7 +144,7 @@ task.spawn(function()
                     hum.Health = math.huge
                     hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
                 end
-                -- إزالة مستشعرات الموت اللحظي إن وجدت ملتصقة باللاعب
+                -- التخلص من المستشعرات الضارة الملتصقة باللاعب
                 for _, part in pairs(char:GetDescendants()) do
                     if part:IsA("TouchTransmitter") then
                         part:Destroy()
@@ -157,24 +156,28 @@ task.spawn(function()
     end
 end)
 
--- دالة حركة السحب السلسة بسرعة 200
-local function walkToPart(part)
-    if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+-- دالة تجعل اللاعب يمشي على الأرض لتسجيل الحساب والنقاط
+local function walkToPartOnGround(part)
+    if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hum = LocalPlayer.Character.Humanoid
         local hrp = LocalPlayer.Character.HumanoidRootPart
-        local targetCFrame = part.CFrame * CFrame.new(0, 3, 0)
         
-        local distance = (hrp.Position - targetCFrame.Position).Magnitude
-        local duration = distance / 200
+        -- تعديل سرعة المشي الافتراضية إذا كنت تريد حركة أسرع، مثلاً 50
+        hum.WalkSpeed = 50 
         
-        if duration < 0.05 then duration = 0.05 end
+        -- إعطاء أمر للشخصية بالمشي نحو المنصة مباشرة فوق الأرض
+        hum:MoveTo(part.Position)
         
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+        -- الانتظار حتى يصل اللاعب للمنصة أو يقترب منها جداً
+        local timeOut = 0
+        while (hrp.Position - part.Position).Magnitude > 4 and activeWinLoop == part and timeOut < 10 do
+            hum:MoveTo(part.Position)
+            task.wait(0.1)
+            timeOut = timeOut + 0.1
+        end
         
-        tween:Play()
-        tween.Completed:Wait()
-        
-        if firetouchinterest then
+        -- تفعيل اللمس يدوياً للتأكيد الفوري
+        if firetouchinterest and activeWinLoop == part then
             firetouchinterest(hrp, part, 0)
             task.wait(0.02)
             firetouchinterest(hrp, part, 1)
@@ -182,7 +185,7 @@ local function walkToPart(part)
     end
 end
 
--- دالة الفحص المعمّق لجلب كافة المنصات بدون تفويت
+-- دالة الفحص المعمّق للمنصات
 local function scanAllPlatforms()
     for _, v in pairs(Workspace:GetDescendants()) do
         if v:IsA("TouchTransmitter") and v.Parent then
@@ -191,7 +194,6 @@ local function scanAllPlatforms()
             local isWinPlatform = false
             local hasStep = false
             
-            -- 1. فحص اللوحات النصية القريبة
             local container = btnPart.Parent
             if container then
                 for _, child in pairs(container:GetDescendants()) do
@@ -206,7 +208,6 @@ local function scanAllPlatforms()
                     end
                 end
                 
-                -- 2. إذا لم يجد لوحة نصية، يقرأ اسم الحاوية أو الموديل نفسه (للمنصات البعيدة المقفلة)
                 if not isWinPlatform and not hasStep then
                     local cName = container.Name:lower()
                     if string.find(cName, "win") or string.find(cName, "platform") or btnPart.Name:lower():find("win") then
@@ -216,7 +217,6 @@ local function scanAllPlatforms()
                 end
             end
             
-            -- فحص أخير لتأكيد الاستبعاد (تخطي مناطق الموت والخطوات)
             if isWinPlatform and not hasStep and not foundButtons[btnPart] then
                 local lowerPartName = btnPart.Name:lower()
                 if not string.find(lowerPartName, "kill") and not string.find(lowerPartName, "lava") then
@@ -258,8 +258,8 @@ local function scanAllPlatforms()
                             
                             task.spawn(function()
                                 while activeWinLoop == currentLoop do
-                                    walkToPart(currentLoop)
-                                    task.wait(0.3)
+                                    walkToPartOnGround(currentLoop)
+                                    task.wait(0.5)
                                 end
                                 NewBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                                 buttonToggles[currentLoop] = false
@@ -276,7 +276,7 @@ local function scanAllPlatforms()
     end
 end
 
--- تكرار فحص الماب المكثف كل ثانيتين لضمان استخراج كافة المنصات الجديدة
+-- تكرار فحص الماب تلقائياً
 task.spawn(function()
     while true do
         scanAllPlatforms()
